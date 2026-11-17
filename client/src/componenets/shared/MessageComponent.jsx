@@ -15,13 +15,13 @@ const renderContent= (text, query)=>{
   const q= query?.trim();
   if(!q) return text;
 
-  return text.split(new RegExp(`(${escapeRegExp(q)})`, "gi")).map((part, i)=>{
+  return text.split(new RegExp(`(${escapeRegExp(q)})`, "gi")).map((part, i)=>
     i%2===1 ?(
       <mark key={i} style={{background:'#facc15', color:"#111", borderRadius: 3, padding:"0 2px"}}>{part}</mark>
     ):(
       part
     )
-  })
+)
 };
 
 const MessageComponent = ({ message, user , isPinned= false, onTogglePin, searchQuery="", isActive=false,}) => {
