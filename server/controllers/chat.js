@@ -3,6 +3,7 @@ import {
   NEW_MESSAGE,
   NEW_MESSAGE_ALERT,
   REFETCH_CHATS,
+  MESSAGE_PIN
 } from "../constants/event.js";
 import { getOtherMembers } from "../lib/helper.js";
 import { TryCatch } from "../middlewares/error.js";
@@ -11,6 +12,7 @@ import { Message } from "../models/message.js";
 import { User } from "../models/user.js";
 import { deleteFilesFromCloudinary, emmitEvent, uploadFilesToCloudinary } from "../utils/features.js";
 import { ErrorHandler } from "../utils/utility.js";
+
 
 const newGroupChat = TryCatch(async (req, res, next) => {
   const { name, members } = req.body;
@@ -278,7 +280,7 @@ const sendMessage = TryCatch(async (req, res, next) => {
   const message = await Message.create(messageForDb);
 
   emmitEvent(req, NEW_MESSAGE, chat.members, {
-    message: messageForRealTime,
+    message: {...messageForRealTime,_id:message._id},
     chatId,
   });
   emmitEvent(req, NEW_MESSAGE_ALERT, chat.members, { chatId });
@@ -428,9 +430,50 @@ const getMessages = TryCatch(async (req, res, next) => {
   });
 });
 
+//controller for getting pinned message
+const getPinnedMessage=TryCatch(async (req,res,next)=>{
+  const chatId=req.params.id;
+  const chat= await Chat.findById(chatId);
+
+  if(!chat) return next(new ErrorHandler("Chat Not Foound",404));
+
+  if(!chat.members.some((member)=>member.toString()===req.user.toString())) return next(new ErrorHandler("You are not allowed to access this chat",403));
+
+  const messages= (await Message.find({chat:chatId,isPinned:true})).sort({pinnedAt:1}).populate("sender","name avatar").lean();
+
+  return res.status(200).json({success:true, messages});
+});
+
+//when user click on unpinned msg then we need to toggle that 
+const togglePinMessage= TryCatch(async (req,res,next)=>{
+
+  const msg=await Message.findById(req.params.id);
+
+  if(!msg) return next(new ErrorHandler("Message Not Found",404));
+
+  const chat =await Chat.findById(msg.chat);
+  if(!chat) return next(new ErrorHandler("Chat Not Found", 404));
+
+  if(!chat.members.some((member)=>member.toString()===req.user.toString())) return next(new ErrorHandler("You are not allowed to access this chat",403));
+
+  msg.isPinned=!msg.isPinned;
+  msg.pinnedBy= msg.isPinned? req.user:null;
+  msg.pinnedAt= msg.isPinned?new Date():null;
+
+  await msg.save();
+
+  emmitEvent(req, MESSAGE_PIN, chat.members, {chatId:chat._id.toString(),messageId:msg._id.toString(),isPinned:msg.isPinned,});
+
+  return res.status(200).json({
+    success:true,
+    isPinned:msg.isPinned,
+    message:msg.isPinned?"Message Pinned":"Message unpinned",
+  });
+});
+
 export {
   addMember, changeGroupName,
   deleteChat, getChatDetails, getMessages, getMyChats,
-  getMyGroups, leaveGroup, newGroupChat, removeMembers, sendMessage
+  getMyGroups, leaveGroup, newGroupChat, removeMembers, sendMessage,getPinnedMessage,togglePinMessage
 };
 

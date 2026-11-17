@@ -7,6 +7,8 @@ import { createServer } from "http";
 import { v4 as uuid } from "uuid";
 import cors from "cors";
 
+import mongoose from "mongoose";
+
 import userRoutes from "./routes/user.js";
 import chatRoutes from "./routes/chat.js";
 import adminRoutes from "./routes/admin.js";
@@ -79,9 +81,10 @@ io.on("connection", (socket) => {
   userSocketIDs.set(user._id.toString(), socket.id);
   // console.log(userSocketIDs);
   socket.on(NEW_MESSAGE, async ({ chatId, message, members }) => {
+    const messageId= new mongoose.Types.ObjectId();
     const messageForRealTime = {
       content: message,
-      _id: uuid(),
+      _id: messageId,
       sender: {
         _id: user._id,
         name: user.name,
@@ -90,6 +93,7 @@ io.on("connection", (socket) => {
       createdAt: new Date().toISOString(),
     };
     const messageForDB = {
+      _id:messageId,
       content: message,
       sender: user._id,
       chat: chatId,

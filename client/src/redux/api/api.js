@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 import { server } from "../../contants/config.js";
+import { getPinnedMessage, togglePinMessage } from "../../../../server/controllers/chat.js";
 
 const api = createApi({
   reducerPath: "api",
@@ -14,7 +15,7 @@ const api = createApi({
       return headers;
     },
   }),
-  tagTypes: ["Chats", "User", "Message", "Admin"],
+  tagTypes: ["Chats", "User", "Message", "Admin","Pinned"],
 
   endpoints: (builder) => ({
     myChats: builder.query({
@@ -103,6 +104,21 @@ const api = createApi({
       }),
       keepUnusedDataFor: 0,
     }),
+    getPinnedMessage:builder.query({
+      query:(chatId)=>({
+        url: `chat/message/${chatId}/pinned`,
+        credentials:"include",
+      }),
+      providesTags:["Pinned"],
+    }),
+    togglePinMessage:builder.mutation({
+      query:(messageId)=>({
+        url:`chat/message/${messageId}/pin`,
+        method:"PUT",
+        credentials:"include",
+      }),
+      invalidatesTags:["Pinned"],
+    }),
     sendAttatchement: builder.mutation({
       query: (data) => ({
         url: "chat/message",
@@ -167,6 +183,8 @@ const api = createApi({
 
 export default api;
 export const {
+  useGetPinnedMessageQuery,
+  useTogglePinMessageMutation,
   useMyChatsQuery,
   useLazySearchUserQuery,
   useSendFriendReqMutation,

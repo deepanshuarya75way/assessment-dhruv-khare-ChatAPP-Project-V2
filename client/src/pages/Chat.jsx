@@ -1,4 +1,4 @@
-import { Box, IconButton, Skeleton, Stack, Typography } from "@mui/material";
+import { Box, IconButton, InputBase, Skeleton, Stack, Typography } from "@mui/material";
 import Applayout from "../componenets/layout/Applayout.jsx";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -6,6 +6,11 @@ import {
   ChatBubbleOutline as ChatBubbleOutlineIcon,
   Lock as LockIcon,
   Send as SendIcon,
+  Close as CloaseIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
+  KeyboardArrowUp as KeyboardArrowUpIcon,
+  PushPin as PushPinIcon,
+  Search as SearchIcon,
 } from "@mui/icons-material";
 import { InputBox } from "../componenets/styled/StyledComponent.jsx";
 import FileMenu from "../componenets/Dialog/FileMenu.jsx";
@@ -18,8 +23,11 @@ import {
   NEW_MESSAGE,
   START_TYPING,
   STOP_TYPING,
+  MESSAGE_PIN,
 } from "../contants/event.js";
 import {
+  useGetPinnedMessageQuery,
+  useTogglePinMessageMutation,
   useGetChatDetailsQuery,
   useGetMyMessagesQuery,
 } from "../redux/api/api.js";
@@ -32,6 +40,9 @@ import { TypingLoader } from "../componenets/layout/Loaders.jsx";
 import { useNavigate } from "react-router-dom";
 import AvatarCard from "../componenets/shared/AvatarCard.jsx";
 
+import toast from "react-hot-toast";
+import { activeAnimations } from "framer-motion";
+
 const Chat = ({ chatId, user, selectedChat }) => {
   const containerRef = useRef(null);
   const bottomRef = useRef(null);
@@ -39,6 +50,16 @@ const Chat = ({ chatId, user, selectedChat }) => {
   const socket = useSocket();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchText, setSearchtext] = useState("");
+  const [matchOffset, setMatchOffset] = useState(0);
+  const [jumpId, setJumpId] = useState(null);
+  const [flashId, setFlashId] = useState(null);
+  const [pinCursor, setPinCursor] = useState(0);
+  const pinnedQuery = useGetPinnedMessageQuery(chatId, { skip: !chatId });
+  const refetchPinned = pinnedQuery.refetch;
+  const [togglePin] = useTogglePinMessageMutation();
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
@@ -159,11 +180,20 @@ const Chat = ({ chatId, user, selectedChat }) => {
     [chatId],
   );
 
+  const pinUpdatedListener = useCallback(
+    (data) => {
+      if (data.chatId !== chatId) return;
+      refetchPinned();
+    },
+    [chatId, refetchPinned],
+  );
+
   const eventArr = {
     [ALERT]: newAlertListener,
     [NEW_MESSAGE]: newMessagesHandler,
     [START_TYPING]: startTypingListener,
     [STOP_TYPING]: stopTypingListener,
+    [MESSAGE_PIN]: pinUpdatedListener,
   };
 
   useSocketEvents(socket, eventArr);
@@ -171,6 +201,90 @@ const Chat = ({ chatId, user, selectedChat }) => {
   useErrors(errors);
 
   const allMessages = [...(oldMessages || []), ...(messages || [])];
+
+  const pinnedMessages = pinnedQuery?.data?.messages || [];
+  const pinnedIds = new Set(pinnedMessages.map((m) => m._id));
+  const pinnedShown = pinnedMessages.length ? pinnedMessages[pinnedMessages.length - 1 - (pinCursor % pinnedMessages.length)] : null;
+  const togglePinHandler = useCallBack(
+    async (messageid) => {
+      const res = await togglePin(messageId);
+
+      if (res.error) toast.error(res.error?.data?.message || "Something went wrong");
+      else toast.success(res.data?.message || " Done");
+    },
+    [togglePin],
+  );
+
+  const searchQ = searchText.trim().toLowerCase();
+  const matchIds = searchOpen && searchQ ?
+    allMessages.filter((m) => m.content?.toLowerCase().includes(searchQ)).map((m) => m._id) :
+    [];
+
+  const safeOffset = matchIds.length ? M.min(matchOffset, matchIds.length - 1) : 0;
+  const activeMatchId = matchIds.length ? matchIds[matchIds.length - 1 - safeOffset] : null;
+
+  const scrollToMessage = useCallback((id) => {
+    const el = document.getElementById(`msg-${id}`);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    return true;
+  }, []);
+
+  const jumpToMessage = (id) => {
+    setFlashId(id);
+    setTimeout(() => setFlashId(null), 1800);
+    if (scrollToMessage(id)) return;
+    setJumpId(id);
+  };
+
+  const pinnedBarClickHandler = () => {
+    if (!pinnedShown) return;
+    jumpToMessage(pinnedShown._id);
+    setPinCursor((c) => c + 1);
+  };
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchtext("");
+    setMatchOffset(0);
+  };
+
+  const olderMatch = () => setMatchOffset((o) => Math.min(o + 1, matchIds.length - 1));
+  const newerMatch = () => setMatchOffset((o) => Math.min(o - 1, 0));
+  const searchKeyHandler = (e) => {
+    if (e.key === "Enter") (e.shiftKey ? newerMatch : olderMatch)();
+    if (e.key === "Escape") closeSearch();
+  }
+
+
+  useEffect(()=>{
+    setJumpId(null);
+    setFlashId(null);
+    setPinCursor(0);
+    setSearchOpen(false);
+    setSearchtext("");
+    setMatchOffset(0);
+  },[chatId]);
+
+  useEffect(()=>{
+    if(jumpId && scrollToMessage(jumpId)){
+      setJumpId(null);
+      return;
+    }
+
+    const needsMore=jumpId || (searchOpen && searchQ);
+    if(needsMore && !oldMessagesChunk.isFetching && page <totalPage){
+      setPage((p)=>p+1);
+    }
+  },[jumpId, searchOpen, searchQ, page, totalPage, allMessages.length, oldMessagesChunk.isFetching]);
+
+  useEffect(()=>{
+    if(activeMatchId) scrollToMessage(activeMatchId);
+  }, [activeMatchId, scrollToMessage]);
+
+  const barsHeightRem= (pinnedShown ?2.75:0)+(searchOpen?3.25:0);
+
+
   const conversationTitle = selectedChat?.groupChat
     ? chatDetails?.data?.chat?.name
     : selectedChat?.name || chatDetails?.data?.chat?.name || "Conversation";
@@ -208,27 +322,98 @@ const Chat = ({ chatId, user, selectedChat }) => {
             </Stack>
           </Stack>
         </Stack>
-        <Box
-          sx={{
-            display: { xs: "none", sm: "block" },
-            px: 1.25,
-            py: 0.5,
-            borderRadius: 99,
-            bgcolor: "action.selected",
-            color: "primary.main",
-            fontSize: 12,
-            fontWeight: 900,
-          }}
-        >
-          Secure
-        </Box>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <IconButton onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}>
+            <SearchIcon />
+          </IconButton>
+
+          <Box
+            sx={{
+              display: { xs: "none", sm: "block" },
+              px: 1.25,
+              py: 0.5,
+              borderRadius: 99,
+              bgcolor: "action.selected",
+              color: "primary.main",
+              fontSize: 12,
+              fontWeight: 900,
+            }}
+          >
+            Secure
+          </Box>
+        </Stack>
       </Box>
+
+      {
+        searchOpen && (
+          <Stack
+            direction="row" alignItems="center" spacing={1}
+            sx={{
+              height: "3.2rem", boxSizing: "border-box", px: { xs: 1.5, sm: 2.5 },
+              bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider",
+            }}
+          >
+            <SearchIcon sx={{ color: "text.secondary" }} />
+            <InputBase
+              autoFocus fullWidth placeholder="Search in Conversation"
+              value={searchText}
+              onChange={(e) => {
+                setSearchtext(e.target.value);
+                setMatchOffset(0);
+              }}
+              onKeyDown={searchKeyHandler}
+            />
+            {searchQ && (
+              <Typography variant="caption" color="text.secondary" fontWeight={700} noWrap>
+                {matchIds.length ? `${matchIds.length - safeOffset} of ${matchIds.length}` : "No resuts"}
+              </Typography>
+            )}
+            <IconButton size="small" disabled={safeOffset >= matchIds.length - 1} onClick={olderMatch}>
+              <KeyboardArrowUpIcon />
+            </IconButton>
+            <IconButton size="small" disabled={safeOffset === 0} onClick={newerMatch}>
+              <KeyboardArrowDownIcon />
+            </IconButton>
+            <IconButton size="small" onClick={closeSearch}>
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        )
+      }
+
+      {
+        pinnedShown && (
+          <Stack
+            direction="row" alignItems="center" spacing={1.25}
+            onClick={pinnedBarClickHandler}
+            sx={{
+              height:"2.75rem", boxSizing:"border-box", px:{xs:2, sm:2.5},
+              cursor:"pointer", bgcolor:"background.paper",
+              borderBottom:"1px solid", borderColor:"divider",
+              "&:hover":{bgcolor:"action.hover"},
+            }} 
+          >
+            <PushPinIcon sx={{fontSize:18, color:"primary.main"}}/>
+            <Stack minWidth={0} flexGrow={1}>
+              <Typography variant="caption" color="primary.main" fontWeight={800} lineHeight={1.2}>
+                Pinned message
+                {pinnedMessages.length>1
+                ? `${pinnedMessages.length-(pinCursor % pinnedMessages.length)} of ${pinnedMessages.length}`:""}
+              </Typography>
+              <Typography variant="body2" noWrap lineHeight={1.3}>
+                {pinnedShown.content || "Attachment"}
+              </Typography>
+            </Stack>
+          </Stack>
+        )
+      }
+
       <Stack
         ref={containerRef}
         boxSizing={"border-box"}
         padding={"1rem"}
         spacing={"1rem"}
-        height={"calc(90% - 4.5rem)"}
+        height={`calc(90% - ${4.5+ barsHeightRem}rem)`}
         sx={{
           overflowX: "hidden",
           overflowY: "auto",
@@ -240,7 +425,7 @@ const Chat = ({ chatId, user, selectedChat }) => {
       >
         {allMessages.length > 0 ? (
           allMessages.map((i) => (
-            <MessageComponent key={i._id} message={i} user={user} />
+            <MessageComponent key={i._id} message={i} user={user} isPinned={pinnedIds.has(i._id)} onTogglePin={togglePinHandler} searchQuery={searchOpen ? searchText:""} isActive={i._id===activeMatchId || i._id===flashId} />
           ))
         ) : (
           <Stack

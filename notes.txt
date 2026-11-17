@@ -42,3 +42,12 @@ InfiniteScroll: in infinite scroll the page is automatically added when we reach
 
 
 2:57
+
+TASK:
+1- messages pin/unpin- we can use a stack state based on the message date time  (Action menu)
+2- message search bar- it should instantly highlight the matched results also show the count 
+
+
+
+we need to first change the modelof the messages
+fields added : pinned or not and also pinnedBy and time 

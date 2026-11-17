@@ -10,7 +10,9 @@ import {
   leaveGroup,
   newGroupChat,
   removeMembers,
-  sendMessage
+  sendMessage,
+  getPinnedMessage,
+  togglePinMessage
 } from "../controllers/chat.js";
 import { addMemberValidator, changeGroupNameValidator, chatIdValidator, newGroupChatValidator, removeMemberValidator, sendAttatchementValidator, validate } from "../lib/validators.js";
 import { isAuthenticatd } from "../middlewares/auth.js";
@@ -33,5 +35,8 @@ app.post("/message", sendAttatchementMulter, sendAttatchementValidator(),validat
 app.get("/message/:id",chatIdValidator(),validate, getMessages);
 //get chat Details,rename,delete
 app.route("/:id").get(chatIdValidator(),validate, getChatDetails).put(changeGroupNameValidator(),validate,changeGroupName).delete(chatIdValidator(),validate,deleteChat);
+
+app.get("/message/:id/pinned", chatIdValidator(), validate, getPinnedMessage);
+app.put("message/:id/pin", chatIdValidator(), validate, togglePinMessage);
 
 export default app;
