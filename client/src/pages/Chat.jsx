@@ -58,7 +58,7 @@ const Chat = ({ chatId, user, selectedChat }) => {
   const [flashId, setFlashId] = useState(null);
   const [pinCursor, setPinCursor] = useState(0);
   const pinnedQuery = useGetPinnedMessageQuery(chatId, { skip: !chatId });
-  console.log("debug", pinnedQuery);
+  // console.log("debug", pinnedQuery);
   const pinnedMessages=useMemo(()=>pinnedQuery.data?.messages || [],[pinnedQuery.data],);
   const refetchPinned = pinnedQuery.refetch;
   const [togglePin] = useTogglePinMessageMutation();
