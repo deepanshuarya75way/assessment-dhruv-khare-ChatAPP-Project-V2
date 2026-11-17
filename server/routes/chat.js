@@ -37,6 +37,6 @@ app.get("/message/:id",chatIdValidator(),validate, getMessages);
 app.route("/:id").get(chatIdValidator(),validate, getChatDetails).put(changeGroupNameValidator(),validate,changeGroupName).delete(chatIdValidator(),validate,deleteChat);
 
 app.get("/message/:id/pinned", chatIdValidator(), validate, getPinnedMessage);
-app.put("message/:id/pin", chatIdValidator(), validate, togglePinMessage);
+app.put("/message/:id/pin", chatIdValidator(), validate, togglePinMessage);
 
 export default app;

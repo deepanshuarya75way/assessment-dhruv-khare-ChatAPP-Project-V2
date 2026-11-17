@@ -1,12 +1,12 @@
 import { Box, IconButton, InputBase, Skeleton, Stack, Typography } from "@mui/material";
 import Applayout from "../componenets/layout/Applayout.jsx";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
   AttachFile as AttachFileIcon,
   ChatBubbleOutline as ChatBubbleOutlineIcon,
   Lock as LockIcon,
   Send as SendIcon,
-  Close as CloaseIcon,
+  Close as CloseIcon,
   KeyboardArrowDown as KeyboardArrowDownIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
   PushPin as PushPinIcon,
@@ -58,6 +58,8 @@ const Chat = ({ chatId, user, selectedChat }) => {
   const [flashId, setFlashId] = useState(null);
   const [pinCursor, setPinCursor] = useState(0);
   const pinnedQuery = useGetPinnedMessageQuery(chatId, { skip: !chatId });
+  console.log("debug", pinnedQuery);
+  const pinnedMessages=useMemo(()=>pinnedQuery.data?.messages || [],[pinnedQuery.data],);
   const refetchPinned = pinnedQuery.refetch;
   const [togglePin] = useTogglePinMessageMutation();
 
@@ -202,11 +204,11 @@ const Chat = ({ chatId, user, selectedChat }) => {
 
   const allMessages = [...(oldMessages || []), ...(messages || [])];
 
-  const pinnedMessages = pinnedQuery?.data?.messages || [];
+  // const pinnedMessages = pinnedQuery?.data?.messages || [];
   const pinnedIds = new Set(pinnedMessages.map((m) => m._id));
   const pinnedShown = pinnedMessages.length ? pinnedMessages[pinnedMessages.length - 1 - (pinCursor % pinnedMessages.length)] : null;
-  const togglePinHandler = useCallBack(
-    async (messageid) => {
+  const togglePinHandler = useCallback(
+    async (messageId) => {
       const res = await togglePin(messageId);
 
       if (res.error) toast.error(res.error?.data?.message || "Something went wrong");
@@ -220,7 +222,7 @@ const Chat = ({ chatId, user, selectedChat }) => {
     allMessages.filter((m) => m.content?.toLowerCase().includes(searchQ)).map((m) => m._id) :
     [];
 
-  const safeOffset = matchIds.length ? M.min(matchOffset, matchIds.length - 1) : 0;
+  const safeOffset = matchIds.length ? Math.min(matchOffset, matchIds.length - 1) : 0;
   const activeMatchId = matchIds.length ? matchIds[matchIds.length - 1 - safeOffset] : null;
 
   const scrollToMessage = useCallback((id) => {
@@ -425,7 +427,14 @@ const Chat = ({ chatId, user, selectedChat }) => {
       >
         {allMessages.length > 0 ? (
           allMessages.map((i) => (
-            <MessageComponent key={i._id} message={i} user={user} isPinned={pinnedIds.has(i._id)} onTogglePin={togglePinHandler} searchQuery={searchOpen ? searchText:""} isActive={i._id===activeMatchId || i._id===flashId} />
+            <MessageComponent
+             key={i._id}
+             message={i}
+            user={user}
+             isPinned={pinnedIds.has(i._id)} 
+             onTogglePin={togglePinHandler} 
+             searchQuery={searchOpen ? searchText:""} 
+             isActive={i._id===activeMatchId || i._id===flashId} />
           ))
         ) : (
           <Stack

@@ -31,7 +31,7 @@ const MessageComponent = ({ message, user , isPinned= false, onTogglePin, search
   const sameSender = (sender?._id || sender?.id) === user?._id;
   const timeAgo = moment(createdAt).fromNow();
   const [menuAnchor ,setMenuAnchor]= useState(null);
-  // const canPin= 
+ const canPin= /^[a-f\d]{24}$/i.test(String(_id ||"")); 
   const closeMenu= ()=> setMenuAnchor(null);
 
   return (

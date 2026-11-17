@@ -1,7 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 import { server } from "../../contants/config.js";
-import { getPinnedMessage, togglePinMessage } from "../../../../server/controllers/chat.js";
 
 const api = createApi({
   reducerPath: "api",

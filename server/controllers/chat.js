@@ -439,7 +439,9 @@ const getPinnedMessage=TryCatch(async (req,res,next)=>{
 
   if(!chat.members.some((member)=>member.toString()===req.user.toString())) return next(new ErrorHandler("You are not allowed to access this chat",403));
 
-  const messages= (await Message.find({chat:chatId,isPinned:true})).sort({pinnedAt:1}).populate("sender","name avatar").lean();
+  const messages= await Message.find({chat:chatId,isPinned:true}).populate("sender","name avatar").lean();
+
+  messages.sort((a,b)=>new Date(a.pinnedAt)-new Date(b.pinnedAt));
 
   return res.status(200).json({success:true, messages});
 });
